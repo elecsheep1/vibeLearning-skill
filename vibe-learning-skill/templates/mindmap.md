@@ -1,69 +1,71 @@
-# 知识框架图
+# 知识框架图 / 思维导图
 
 ---
 
-## 主题：[章节/科目名称]
+## 输出格式
+
+思维导图默认生成 **XMind 格式**（`.xmind`），使用 Python 脚本打包：
+- `content.json`：topic 节点树，每个节点包含 `id`, `class: "topic"`, `title`, 可选 `children.attached`
+- `metadata.json`：创建者与创建日期
+- `manifest.json`：文件清单
+- 以上三个文件打包为 ZIP，后缀名 `.xmind`
+
+生成脚本需输出到 `$CLAUDE_JOB_DIR/tmp/generate_xmind.py` 并执行。
 
 ---
 
-## Mermaid 思维导图
+## XMind content.json 节点结构
 
-```mermaid
-mindmap
-  root((核心主题))
-    章节一
-      知识点 1.1
-      知识点 1.2
-        子知识点 1.2.1
-        子知识点 1.2.2
-      知识点 1.3
-    章节二
-      知识点 2.1
-      知识点 2.2
-    章节三
-      知识点 3.1
-      知识点 3.2
+```json
+{
+  "id": "unique-id",
+  "class": "topic",
+  "title": "节点标题",
+  "children": {
+    "attached": [
+      { "id": "...", "class": "topic", "title": "子节点1" },
+      { "id": "...", "class": "topic", "title": "子节点2" }
+    ]
+  }
+}
+```
+
+根 sheet 结构：
+```json
+[{
+  "id": "sheet-id",
+  "class": "sheet",
+  "title": "Sheet 标题",
+  "rootTopic": { ... }
+}]
 ```
 
 ---
 
-## 结构化大纲
+## 辅助函数模板（Python）
 
-### 一、[章节一]
-- **1.1 [知识点]**
-  - 核心概念：
-  - 关键公式/定理：
-  - 常见题型：
-- **1.2 [知识点]**
-  - …
+```python
+import json, zipfile, os, uuid
 
-### 二、[章节二]
-- **2.1 [知识点]**
-  - …
+def make_topic(title, children=None):
+    topic = {"id": uuid.uuid4().hex[:10], "class": "topic", "title": title}
+    if children:
+        topic["children"] = {"attached": children}
+    return topic
 
----
-
-## 知识关联表
-
-| 节点 | 前置依赖 | 后续延伸 | 关联知识点 |
-|------|---------|---------|-----------|
-| A    | —       | C, D    | B         |
-| B    | —       | C       | A         |
-| C    | A, B    | E, F    | D         |
-| D    | A       | E       | C         |
-| E    | C, D    | —       | —         |
-| F    | C       | —       | —         |
+def generate_xmind(output_path, root_title, build_tree_fn):
+    root_topic = build_tree_fn()
+    sheet = [{"id": uuid.uuid4().hex[:10], "class": "sheet", "title": root_title, "rootTopic": root_topic}]
+    metadata = {"creator": {"name": "Claude Code", "version": "1.0"}, "created": "YYYY-MM-DD"}
+    manifest = {"file-entries": {"content.json": {}, "metadata.json": {}}}
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('content.json', json.dumps(sheet, ensure_ascii=False, indent=2))
+        zf.writestr('metadata.json', json.dumps(metadata, ensure_ascii=False, indent=2))
+        zf.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=2))
+```
 
 ---
 
-## 重点标注
+## 配套 markdown 大纲
 
-- 🔴 **高频考点**：[知识点]
-- 🟡 **理解难点**：[知识点]
-- 🟢 **基础必备**：[知识点]
-
----
-
-## 一句话总结
-
-> [用一句话概括本章的核心思想或主线逻辑]
+`.xmind` 用于可视化浏览，同时生成 markdown 结构化大纲（嵌套列表）作为文本版，方便 grep/搜索/版本控制。
